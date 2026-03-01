@@ -9,7 +9,13 @@ const protect = async (req, res, next) => {
             token = req.headers.authorization.split(' ')[1];
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
+            // Marrim krejt userin (përfshirë name dhe role)
             req.user = await User.findById(decoded.id).select('-password');
+            
+            if (!req.user) {
+                return res.status(401).json({ message: 'Përdoruesi nuk ekziston më' });
+            }
+            
             next();
         } catch (error) {
             res.status(401).json({ message: 'Jo i autorizuar, token dështoi' });
@@ -21,9 +27,9 @@ const protect = async (req, res, next) => {
     }
 };
 
-// Middleware për Role-Based Access Control (RBAC)
 const authorize = (...roles) => {
     return (req, res, next) => {
+        // Kontrollon nëse roli i userit është në listën e lejuar
         if (!roles.includes(req.user.role)) {
             return res.status(403).json({ 
                 message: `Roli ${req.user.role} nuk ka leje për këtë veprim` 
