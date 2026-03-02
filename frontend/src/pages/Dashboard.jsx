@@ -124,11 +124,8 @@ const AddItemForm = ({ onRefresh }) => {
                 location: formData.location.toUpperCase().trim() 
             };
             
-            // KËTU ËSHTË NDRYSHIMI KYÇ:
             const response = await API.post('/inventory', dataToSubmit);
-        
-        // Printojmë barkodin që na ktheu Backend-i (response.data.data)
-             printDirectly(response.data.data);
+            printDirectly(response.data.data);
             
             alert("✅ Aseti u shtua me sukses!");
             
@@ -216,6 +213,7 @@ const InventoryDashboard = ({ isAdmin, isSuperViewer, userInfo }) => {
     const [selectedLocation, setSelectedLocation] = useState('KREJT FK');
     const [selectedStatus, setSelectedStatus] = useState('all');
     const [selectedValue, setSelectedValue] = useState('all');
+    const [searchTerm, setSearchTerm] = useState("");
     const [loading, setLoading] = useState(false);
     const [commission, setCommission] = useState({ member1: '', member2: '', member3: '' });
 
@@ -227,54 +225,10 @@ const InventoryDashboard = ({ isAdmin, isSuperViewer, userInfo }) => {
         try {
             const { data } = await API.get('/inventory');
             setAllItems(data);
+            setFilteredItems(data);
         } catch (error) { console.error("Gabim:", error); } 
         finally { setLoading(false); }
     };
-
-    // --- LOGJIKA E SKANERIT GLOBAL ---
-    useEffect(() => {
-        let barcodeData = "";
-        let timeout;
-
-        const handleKeyDown = (e) => {
-            if (e.key.length>1 && e.key !== "Enter") return;
-              if (e.key === "Enter") {
-                barcodeData +=e.key;
-                console.log("Duke u lexuar:", barcodeData);
-              }
-              clearTimeout(timeout);
-
-              timeout = setTimeout(() => {
-                if (barcodeData.length > 2) {
-                    const scannedSN = barcodeData.trim().toUpperCase();
-                    console.log("Kërkimi për:", scannedSN);
-
-                    const foundItem = allItems.find(item =>{
-                        const itemSN= item.serialNumber.toUpperCase();
-                        return itemSN === scannedSN ||
-                        `*${itemSN}*` === scannedSN ||
-                       scannedSN.includes(itemSN);
-                    
-              });
-
-                if (foundItem) {
-                    setFilteredItems([foundItem]);
-                    console.log("U gjet:", foundItem.description);
-                    // Opsionale: mund të bësh scroll te elementi ose të luash një zë "Bip"
-                }
-                else{
-                    console.log("Kërkimi për:", scannedSN);
-                }
-            }
-                barcodeData = ""; 
-            }, 500);
-        };
-
-       
-
-        window.addEventListener("keydown", handleKeyDown);
-        return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [allItems]);
 
     const openStatusModal = (item, newStatus) => {
         if (item.status === newStatus) return;
@@ -352,23 +306,78 @@ const InventoryDashboard = ({ isAdmin, isSuperViewer, userInfo }) => {
         } catch { alert("Gabim gjatë shkarkimit të PDF!"); }
     };
 
-    useEffect(() => { fetchItems(); }, []);
+    // --- LOGJIKA E SKANERIT GLOBAL ---
+    useEffect(() => {
+        let barcodeData = "";
+        let timeout;
 
+        const handleKeyDown = (e) => {
+            if (e.key.length > 1 && e.key !== "Enter") return;
+            if (e.key !== "Enter") {
+                barcodeData += e.key;
+                console.log("Duke u lexuar:", barcodeData);
+            }
+            clearTimeout(timeout);
+
+            timeout = setTimeout(() => {
+                if (barcodeData.length > 2) {
+                    const scannedSN = barcodeData.trim().toUpperCase().replace(/\*/g, "");
+                    console.log("Kërkimi për:", scannedSN);
+
+                    const foundItem = allItems.find(item => {
+                        if (!item.serialNumber) return false;
+                        const itemSN = item.serialNumber.toString().toUpperCase();
+                        return itemSN === scannedSN || itemSN.includes(scannedSN);
+                    });
+
+                    if (foundItem) {
+                        setSearchTerm(scannedSN);
+                        console.log("U gjet:", foundItem.description);
+                        setTimeout(() => {
+                            setSearchTerm(""); 
+                        }, 10000);
+                    } else {
+                        console.log("Nuk u gjet asgjë për:", scannedSN);
+                    }
+                }
+                barcodeData = "";
+            }, 500);
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [allItems, setSearchTerm]);
+
+    // --- FILTRIMI I TE DHENAVE ---
     useEffect(() => {
         let tempItems = [...allItems];
-        if (selectedLocation !== 'KREJT FK') {
-            tempItems = tempItems.filter(item => item.location?.toUpperCase().trim() === selectedLocation.toUpperCase().trim());
+
+        if (searchTerm) {
+            tempItems = tempItems.filter(item => 
+                item.serialNumber?.toUpperCase().includes(searchTerm.toUpperCase())
+            );
         }
+
+        if (selectedLocation !== 'KREJT FK') {
+            tempItems = tempItems.filter(item => 
+                item.location?.toUpperCase().trim() === selectedLocation.toUpperCase().trim()
+            );
+        }
+        
         if (selectedStatus !== 'all') {
             tempItems = tempItems.filter(item => item.status === selectedStatus);
         }
+        
         if (selectedValue === 'low') {
             tempItems = tempItems.filter(item => item.value < 1000);
         } else if (selectedValue === 'high') {
             tempItems = tempItems.filter(item => item.value >= 1000);
         }
+
         setFilteredItems(tempItems);
-    }, [allItems, selectedLocation, selectedStatus, selectedValue]);
+    }, [allItems, selectedLocation, selectedStatus, selectedValue, searchTerm]);
+
+    useEffect(() => { fetchItems(); }, []);
 
     const uniqueLocations = [...new Set(allItems.map(item => item.location?.toUpperCase().trim()))].filter(Boolean);
 
