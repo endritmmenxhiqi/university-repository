@@ -1,25 +1,39 @@
 const Inventory = require('../models/Inventory');
+const StatusLog = require('../models/StatusLog');
 
-// Funksion ndihmës për të kthyer emrin në email automatikisht
+// --- FUNKSIONET NDIHMËSE (Private) ---
+
+// Kthen emrin në email: "Filan Fisteku" -> "filan.fisteku@umib.net"
 const formatToEmail = (name) => {
     if (!name) return "";
-    // Kthehet në shkronja të vogla, hiqen hapësirat anash, 
-    // dhe hapësira mes emrit/mbiemrit zëvendësohet me pikë
     const cleanName = name.trim().toLowerCase().replace(/\s+/g, '.');
-    // Nëse nuk e përmban @umib.net, ia shton automatikisht
     return cleanName.includes('@umib.net') ? cleanName : `${cleanName}@umib.net`;
 };
 
-// 1. Krijimi i një mjeti të ri
+// Gjeneron një barkod unik UIBM-XXXXX
+const generateUniqueSN = async () => {
+    let isUnique = false;
+    let sn = "";
+    while (!isUnique) {
+        const random5Digit = Math.floor(10000 + Math.random() * 90000);
+        sn = `UIBM-${random5Digit}`;
+        const existing = await Inventory.findOne({ serialNumber: sn });
+        if (!existing) isUnique = true;
+    }
+    return sn;
+};
+
+// --- EXPORTS ---
+
+// 1. KRIJIMI I NJË MJETI TË RI
 exports.createItem = async (req, res) => {
     try {
         let { description, serialNumber, location, value, status, assignedTo, quantity, unit, fundingSource } = req.body;
         
-        const normalizedLocation = location ? location.trim().toUpperCase() : "PANJOHUR";
-        const assignedEmail = formatToEmail(assignedTo);
-
-        // Kontrollo nëse numri serial ekziston (përveç nëse është i zbrazët)
-        if (serialNumber) {
+        // Auto-gjenerimi i barkodit nëse lihet bosh
+        if (!serialNumber || serialNumber.trim() === "") {
+            serialNumber = await generateUniqueSN();
+        } else {
             const serialExists = await Inventory.findOne({ serialNumber });
             if (serialExists) {
                 return res.status(400).json({ message: "Ky numër serial ekziston në sistem!" });
@@ -27,82 +41,105 @@ exports.createItem = async (req, res) => {
         }
 
         const newItem = await Inventory.create({
-            description,
+            description: description.trim(),
             serialNumber,
-            location: normalizedLocation,
-            value,
-            status,
-            assignedTo: assignedEmail,
-            quantity: quantity || 1,
+            location: location ? location.trim().toUpperCase() : "PANJOHUR",
+            value: Number(value) || 0,
+            status: status || 'ne_perdorim',
+            assignedTo: formatToEmail(assignedTo),
+            quantity: Number(quantity) || 1,
             unit: unit || 'copë',
             fundingSource: fundingSource || 'Buxheti i Kosovës',
             createdBy: req.user.id 
         });
 
-        res.status(201).json({
-            message: "Mjeti u shtua me sukses.",
-            data: newItem
-        });
+        res.status(201).json({ message: "Mjeti u shtua me sukses.", data: newItem });
     } catch (error) {
         res.status(500).json({ message: "Gabim gjatë krijimit: " + error.message });
     }
 };
 
-// 2. Marrja e të gjitha mjeteve (me Filtra dhe Role)
+// 2. MARRJA E TË GJITHA MJETEVE (Me filtra dhe role)
 exports.getItems = async (req, res) => {
     try {
         const { location, status, valueRange, search } = req.query;
         let query = {};
 
-        // --- LOGJIKA E ROLIT ---
-        // admin dhe super_viewer shohin gjithçka. Të tjerët shohin vetëm mjetet e tyre.
-        const isAdmin = req.user.role === 'admin';
-        const isSuperViewer = req.user.role === 'super_viewer';
+        // Kontrolli i qasjes sipas rolit
+        const userRole = req.user.role?.toLowerCase();
+        const isAdmin = userRole === 'admin';
+        const isSuperViewer = userRole === 'super_viewer' || userRole === 'superviewer';
 
         if (!isAdmin && !isSuperViewer) {
-            query.assignedTo = req.user.email.toLowerCase().trim(); 
+            // Viewer-at shohin vetëm mjetet e tyre
+            const emailPrefix = req.user.email.split('@')[0];
+            query.assignedTo = { $regex: emailPrefix, $options: 'i' };
         }
 
-        // Filtra sipas Lokacionit
-        if (location && location !== 'KREJT FK') {
-            query.location = location.trim().toUpperCase();
-        }
-
-        // Filtra sipas Statusit
-        if (status && status !== 'all') {
-            query.status = status;
-        }
-
-        // Filtra sipas Vlerës
+        // Filtrat e kërkimit
+        if (location && location !== 'KREJT FK') query.location = location.trim().toUpperCase();
+        if (status && status !== 'all') query.status = status;
         if (valueRange === 'low') query.value = { $lt: 1000 };
         if (valueRange === 'high') query.value = { $gte: 1000 };
 
-        // Kërkimi (Search)
         if (search) {
             query.$or = [
                 { description: { $regex: search, $options: 'i' } },
-                { serialNumber: { $regex: search, $options: 'i' } },
-                { assignedTo: { $regex: search, $options: 'i' } }
+                { serialNumber: { $regex: search, $options: 'i' } }
             ];
         }
 
         const items = await Inventory.find(query)
             .populate('createdBy', 'name email')
-            .sort({ createdAt: -1 }); // Mjetet më të reja dalin të parat
+            .sort({ createdAt: -1 });
 
         res.json(items);
     } catch (error) {
-        res.status(500).json({ message: "Gabim gjatë marrjes së të dhënave: " + error.message });
+        res.status(500).json({ message: "Gabim gjatë marrjes: " + error.message });
     }
 };
 
-// 3. Importi në masë (Bulk Insert)
+// 3. NDRYSHIMI I STATUSIT (Me Logim)
+exports.updateStatus = async (req, res) => {
+    try {
+        const { status, reason } = req.body;
+        const item = await Inventory.findById(req.params.id);
+        
+        if (!item) return res.status(404).json({ message: "Aseti nuk u gjet" });
+        
+        const oldStatus = item.status;
+        item.status = status;
+        await item.save();
+
+        await StatusLog.create({
+            assetId: item._id,
+            oldStatus,
+            newStatus: status,
+            reason: reason || "Ndryshim manual",
+            changedBy: req.user.name || req.user.email 
+        });
+
+        res.json({ message: "Statusi u përditësua", data: item });
+    } catch (error) { 
+        res.status(400).json({ message: "Përditësimi dështoi: " + error.message }); 
+    }
+};
+
+// 4. HISTORIKU I STATUSIT
+exports.getHistory = async (req, res) => {
+    try {
+        const history = await StatusLog.find({ assetId: req.params.id }).sort({ createdAt: -1 });
+        res.json(history);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// 5. IMPORTI NË MASË (BULK)
 exports.bulkInsert = async (req, res) => {
     try {
         let items = req.body; 
-        if (!Array.isArray(items) || items.length === 0) {
-            return res.status(400).json({ message: "Lista e dërguar është bosh!" });
-        }
+        if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ message: "Lista është bosh!" });
 
         const processedItems = items.map(item => ({
             ...item,
@@ -112,26 +149,19 @@ exports.bulkInsert = async (req, res) => {
         }));
 
         const createdItems = await Inventory.insertMany(processedItems);
-        res.status(201).json({ 
-            message: `U importuan me sukses ${createdItems.length} pajisje.`,
-            data: createdItems 
-        });
+        res.status(201).json({ message: `U importuan ${createdItems.length} pajisje.`, data: createdItems });
     } catch (error) {
-        if (error.code === 11000) {
-            return res.status(400).json({ message: "Gabim: Disa pajisje kanë numra serialë duplikatë!" });
-        }
-        res.status(500).json({ message: "Gabim gjatë importit: " + error.message });
+        if (error.code === 11000) return res.status(400).json({ message: "Gabim: Barkod duplikat!" });
+        res.status(500).json({ message: error.message });
     }
 };
 
-// 4. Fshirja e një mjeti
+// 6. FSHIRJA
 exports.deleteItem = async (req, res) => {
     try {
-        const item = await Inventory.findById(req.params.id);
+        const item = await Inventory.findByIdAndDelete(req.params.id);
         if (!item) return res.status(404).json({ message: "Mjeti nuk u gjet!" });
-
-        await Inventory.findByIdAndDelete(req.params.id);
-        res.json({ message: "Mjeti u fshi me sukses." });
+        res.json({ message: "U fshi me sukses." });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

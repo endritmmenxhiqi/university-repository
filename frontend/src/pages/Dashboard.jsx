@@ -58,7 +58,7 @@ const StatusHistoryModal = ({ isOpen, onClose, history }) => {
                                         <td><span className={`status-pill ${log.oldStatus}`}>{log.oldStatus?.replace('_', ' ')}</span></td>
                                         <td><span className={`status-pill ${log.newStatus}`}>➔ {log.newStatus?.replace('_', ' ')}</span></td>
                                         <td>{log.reason}</td>
-                                        <td className="user-cell">{log.changedBy}</td>
+                                        <td className="user-cell">{log.changedBy?.name || log.changedBy}</td>
                                         <td className="date-cell">{new Date(log.createdAt).toLocaleDateString()}</td>
                                     </tr>
                                 )) : <tr><td colSpan="5" style={{textAlign: 'center', padding: '20px'}}>Nuk ka historik për këtë aset.</td></tr>}
@@ -76,15 +76,9 @@ const StatusHistoryModal = ({ isOpen, onClose, history }) => {
 
 // --- FORMULARI PËR REGJISTRIMIN E ASSET ---
 const AddItemForm = ({ onRefresh }) => {
-    const generateAutoSN = () => {
-        const prefix = "UIBM";
-        const random5Digit = Math.floor(10000 + Math.random() * 90000); 
-        return `${prefix}-${random5Digit}`;
-    };
-
+    
     const [formData, setFormData] = useState({
         description: '', 
-        serialNumber: generateAutoSN(),
         location: '', 
         value: '',
         quantity: 1, 
@@ -129,14 +123,17 @@ const AddItemForm = ({ onRefresh }) => {
                 quantity: parseInt(formData.quantity),
                 location: formData.location.toUpperCase().trim() 
             };
-
-            await API.post('/inventory', dataToSubmit);
-            printDirectly(dataToSubmit);
+            
+            // KËTU ËSHTË NDRYSHIMI KYÇ:
+            const response = await API.post('/inventory', dataToSubmit);
+        
+        // Printojmë barkodin që na ktheu Backend-i (response.data.data)
+             printDirectly(response.data.data);
+            
             alert("✅ Aseti u shtua me sukses!");
             
             setFormData({ 
-                description: '', 
-                serialNumber: generateAutoSN(), 
+                description: '',  
                 value: '', 
                 quantity: 1, 
                 location: '',
@@ -147,7 +144,6 @@ const AddItemForm = ({ onRefresh }) => {
             });
             onRefresh();
         } catch (error) {
-            console.error("Error details:", error.response?.data);
             alert("❌ Gabim: " + (error.response?.data?.message || "Provoni përsëri"));
         }
     };
@@ -168,7 +164,7 @@ const AddItemForm = ({ onRefresh }) => {
                 <div className="form-grid-3">
                     <div className="input-group">
                         <label>Numri Serial (ID)</label>
-                        <input type="text" value={formData.serialNumber} readOnly style={{ background: '#f8fafc', fontWeight: 'bold', color: '#3b82f6', border: '1px solid #cbd5e1' }} />
+                        <input type="text" value="Gjenerohet automatikisht" readOnly style={{ background: '#f8fafc', fontWeight: 'bold', color: '#3b82f6', border: '1px solid #cbd5e1' }} />
                     </div>
                     <div className="input-group">
                         <label>Lokacioni</label>
@@ -176,7 +172,7 @@ const AddItemForm = ({ onRefresh }) => {
                     </div>
                     <div className="input-group">
                         <label>Personi Përgjegjës (Email-i)</label>
-                        <input type="text" placeholder="endrit.menxhiqi@umib.net" value={formData.assignedTo} onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })} />
+                        <input type="text" placeholder="emri.mbiemri@umib.net" value={formData.assignedTo} onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })} />
                     </div>
                 </div>
                 <div className="form-grid-4">
@@ -234,6 +230,51 @@ const InventoryDashboard = ({ isAdmin, isSuperViewer, userInfo }) => {
         } catch (error) { console.error("Gabim:", error); } 
         finally { setLoading(false); }
     };
+
+    // --- LOGJIKA E SKANERIT GLOBAL ---
+    useEffect(() => {
+        let barcodeData = "";
+        let timeout;
+
+        const handleKeyDown = (e) => {
+            if (e.key.length>1 && e.key !== "Enter") return;
+              if (e.key === "Enter") {
+                barcodeData +=e.key;
+                console.log("Duke u lexuar:", barcodeData);
+              }
+              clearTimeout(timeout);
+
+              timeout = setTimeout(() => {
+                if (barcodeData.length > 2) {
+                    const scannedSN = barcodeData.trim().toUpperCase();
+                    console.log("Kërkimi për:", scannedSN);
+
+                    const foundItem = allItems.find(item =>{
+                        const itemSN= item.serialNumber.toUpperCase();
+                        return itemSN === scannedSN ||
+                        `*${itemSN}*` === scannedSN ||
+                       scannedSN.includes(itemSN);
+                    
+              });
+
+                if (foundItem) {
+                    setFilteredItems([foundItem]);
+                    console.log("U gjet:", foundItem.description);
+                    // Opsionale: mund të bësh scroll te elementi ose të luash një zë "Bip"
+                }
+                else{
+                    console.log("Kërkimi për:", scannedSN);
+                }
+            }
+                barcodeData = ""; 
+            }, 500);
+        };
+
+       
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [allItems]);
 
     const openStatusModal = (item, newStatus) => {
         if (item.status === newStatus) return;
@@ -313,32 +354,19 @@ const InventoryDashboard = ({ isAdmin, isSuperViewer, userInfo }) => {
 
     useEffect(() => { fetchItems(); }, []);
 
-    // --- RREGULLIMI KRYESOR I FILTRIMIT (TASHMË I SAKTË) ---
     useEffect(() => {
         let tempItems = [...allItems];
-
-        // 1. Filtri i lokacionit
         if (selectedLocation !== 'KREJT FK') {
-            tempItems = tempItems.filter(item => 
-                item.location?.toUpperCase().trim() === selectedLocation.toUpperCase().trim()
-            );
+            tempItems = tempItems.filter(item => item.location?.toUpperCase().trim() === selectedLocation.toUpperCase().trim());
         }
-
-        // 2. Filtri i statusit
         if (selectedStatus !== 'all') {
             tempItems = tempItems.filter(item => item.status === selectedStatus);
         }
-        
-        // 3. Filtri i vlerës
         if (selectedValue === 'low') {
             tempItems = tempItems.filter(item => item.value < 1000);
         } else if (selectedValue === 'high') {
             tempItems = tempItems.filter(item => item.value >= 1000);
         }
-        
-        // Vini re: Hoqëm filtrin manual item.assignedTo === userInfo.email 
-        // sepse Backend-i na i ka filtruar tashmë dhe na i ka sjellë saktë 3 mjetet.
-        
         setFilteredItems(tempItems);
     }, [allItems, selectedLocation, selectedStatus, selectedValue]);
 
@@ -361,7 +389,12 @@ const InventoryDashboard = ({ isAdmin, isSuperViewer, userInfo }) => {
             />
 
             <div className="glass-card filter-card">
-                <h3>📊 Paneli i Kontrollit</h3>
+                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                    <h3>📊 Paneli i Kontrollit</h3>
+                    <button onClick={fetchItems} className="btn-reset" style={{padding: '5px 15px', borderRadius: '8px', cursor: 'pointer', background: '#f1f5f9', border: '1px solid #cbd5e1'}}>Rifresko / Reset</button>
+                </div>
+                <p style={{fontSize: '0.8rem', color: '#64748b', marginTop: '5px'}}>💡 Mund të skanoni barkodin në çdo moment për të gjetur pajisjen.</p>
+                
                 <div className="modern-filters">
                     {(isAdmin || isSuperViewer) && (
                         <div className="filter-group">
@@ -421,7 +454,7 @@ const InventoryDashboard = ({ isAdmin, isSuperViewer, userInfo }) => {
                         </thead>
                         <tbody>
                             {filteredItems.map(item => (
-                                <tr key={item._id}>
+                                <tr key={item._id} className="animate-in">
                                     <td>
                                         <div className="barcode-container">
                                             <span className="barcode-visual">*{item.serialNumber || 'N/A'}*</span>
@@ -574,10 +607,10 @@ const DashboardPage = () => {
                 .status-pill { border: none; padding: 6px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; display: inline-block; }
                 .status-pill.ne_perdorim { background: #dcfce7; color: #166534; }
                 .status-pill.ne_depo { background: #fef9c3; color: #854d0e; }
-                .status-pill.ne_riparim { background: #ffedd5; color: #9a3412; }
-                .status-pill.i_amortizuar { background: #fee2e2; color: #991b1b; }
-                .animate-in { animation: slideUp 0.4s ease-out; }
-                @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+                .status-pill.ne_riparim { background: #fee2e2; color: #991b1b; }
+                .status-pill.i_amortizuar { background: #f1f5f9; color: #475569; }
+                .animate-in { animation: fadeIn 0.4s ease-out; }
+                @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
             `}</style>
         </div>
     );
