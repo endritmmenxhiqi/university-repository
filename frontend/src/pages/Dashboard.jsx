@@ -264,21 +264,80 @@ const InventoryDashboard = ({ isAdmin, isSuperViewer, userInfo }) => {
 
     const handlePrintBarcode = (item) => {
         const printWindow = window.open('', '_blank', 'width=400,height=300');
+        const tapeWidth = "24mm";
         printWindow.document.write(`
-            <html>
-                <head>
-                    <style>
-                        @import url('https://fonts.googleapis.com/css2?family=Libre+Barcode+39&display=swap');
-                        body { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: sans-serif; }
-                        .barcode { font-family: 'Libre Barcode 39', cursive; font-size: 70px; }
-                    </style>
-                </head>
-                <body>
-                    <div class="barcode">*${item.serialNumber}*</div>
-                    <div>${item.serialNumber}</div>
-                    <script>setTimeout(() => { window.print(); window.close(); }, 500);</script>
-                </body>
-            </html>
+                <html>
+            <head>
+                <style>
+                    @import url('https://fonts.googleapis.com/css2?family=Libre+Barcode+39&display=swap');
+                    
+                    @page { 
+                        size: ${tapeWidth} auto; 
+                        margin: 0; 
+                    }
+
+                    body { 
+                        margin: 0; 
+                        padding: 0; 
+                        width: ${tapeWidth};
+                        background: white;
+                        display: block; /* E kthejmë në block që të kemi kontroll mbi margins */
+                    }
+
+                    .barcode-container {
+                        width: 100%;
+                        text-align: center; /* Barkodi mbetet në mes */
+                        margin-top: 2mm;
+                    }
+
+                    .barcode { 
+                        font-family: 'Libre Barcode 39', cursive; 
+                        font-size: 35px; 
+                        line-height: 1;
+                        white-space: nowrap;
+                    }
+
+                    .sn { 
+                            font-size: 11px; 
+                            font-weight: bold; 
+                            font-family: Arial, sans-serif;
+                            margin-top: 1mm;
+                            
+                            /* KËTO DY RRESHTA E QESIN NË MES */
+                            text-align: center; 
+                            width: 100%;
+                            
+                            /* SIGURON QË MBETET NË NJË RRESHT */
+                            white-space: nowrap; 
+                        }
+
+                        .desc { 
+                            font-size: 8px; 
+                            font-family: Arial, sans-serif;
+                            margin-top: 0.5mm;
+                            
+                            /* NJËJTË EDHE PËR PËRSHKRIMIN */
+                            text-align: center;
+                            width: 100%;
+                            white-space: nowrap;
+                            overflow: hidden;
+                            text-overflow: ellipsis; /* Nëse është shumë i gjatë, shton pikë-pikë në fund */
+                        }
+                </style>
+            </head>
+            <body>
+                <div class="barcode-container">
+                    <span class="barcode">*${item.serialNumber}*</span>
+                </div>
+                <div class="sn">${item.serialNumber}</div>
+                <script>
+                    setTimeout(() => { 
+                        window.print(); 
+                        window.close(); 
+                    }, 400);
+                </script>
+            </body>
+        </html>
         `);
         printWindow.document.close();
     };
