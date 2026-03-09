@@ -263,84 +263,65 @@ const InventoryDashboard = ({ isAdmin, isSuperViewer, userInfo }) => {
     };
 
     const handlePrintBarcode = (item) => {
-        const printWindow = window.open('', '_blank', 'width=400,height=300');
-        const tapeWidth = "24mm";
-        printWindow.document.write(`
-                <html>
+    // 1. Hapim një dritare shumë të vogël që Windows-i ta kuptojë që s'është A4
+    const printWindow = window.open('', '_blank', 'width=200,height=100');
+    const tapeWidth = "24mm"; 
+
+    printWindow.document.write(`
+        <html>
             <head>
                 <style>
                     @import url('https://fonts.googleapis.com/css2?family=Libre+Barcode+39&display=swap');
                     
                     @page { 
+                        /* Kjo i thotë printerit: "Gjerësia është 24mm, lartësia aq sa ka tekst" */
                         size: ${tapeWidth} auto; 
                         margin: 0; 
                     }
 
                     body { 
                         margin: 0; 
-                        padding: 0; 
+                        padding: 2mm 0; /* Pak hapësirë lart e poshtë */
                         width: ${tapeWidth};
-                        background: white;
-                        display: block; /* E kthejmë në block që të kemi kontroll mbi margins */
-                    }
-
-                    .barcode-container {
-                        width: 100%;
-                        text-align: center; /* Barkodi mbetet në mes */
-                        margin-top: 2mm;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center; /* Kjo e qet tekstin fiks në mes */
+                        overflow: hidden;
                     }
 
                     .barcode { 
                         font-family: 'Libre Barcode 39', cursive; 
-                        font-size: 35px; 
+                        font-size: 35px; /* Madhësi ideale që të mos thyhet në dy rreshta */
                         line-height: 1;
                         white-space: nowrap;
                     }
 
                     .sn { 
-                            font-size: 11px; 
-                            font-weight: bold; 
-                            font-family: Arial, sans-serif;
-                            margin-top: 1mm;
-                            
-                            /* KËTO DY RRESHTA E QESIN NË MES */
-                            text-align: center; 
-                            width: 100%;
-                            
-                            /* SIGURON QË MBETET NË NJË RRESHT */
-                            white-space: nowrap; 
-                        }
-
-                        .desc { 
-                            font-size: 8px; 
-                            font-family: Arial, sans-serif;
-                            margin-top: 0.5mm;
-                            
-                            /* NJËJTË EDHE PËR PËRSHKRIMIN */
-                            text-align: center;
-                            width: 100%;
-                            white-space: nowrap;
-                            overflow: hidden;
-                            text-overflow: ellipsis; /* Nëse është shumë i gjatë, shton pikë-pikë në fund */
-                        }
+                        font-size: 11px; 
+                        font-weight: bold; 
+                        font-family: Arial, sans-serif;
+                        margin-top: 1mm;
+                        text-align: center;
+                        width: 100%;
+                    }
                 </style>
             </head>
             <body>
-                <div class="barcode-container">
-                    <span class="barcode">*${item.serialNumber}*</span>
-                </div>
+                <div class="barcode">*${item.serialNumber}*</div>
                 <div class="sn">${item.serialNumber}</div>
                 <script>
-                    setTimeout(() => { 
-                        window.print(); 
-                        window.close(); 
-                    }, 400);
+                    window.onload = function() {
+                        setTimeout(() => { 
+                            window.print(); 
+                            window.close(); 
+                        }, 300);
+                    };
                 </script>
             </body>
         </html>
-        `);
-        printWindow.document.close();
-    };
+    `);
+    printWindow.document.close();
+};
 
     const downloadPDF = async () => {
         try {
