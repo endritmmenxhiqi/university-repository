@@ -263,8 +263,7 @@ const InventoryDashboard = ({ isAdmin, isSuperViewer, userInfo }) => {
     };
 
     const handlePrintBarcode = (item) => {
-    // 1. Hapim një dritare shumë të vogël që Windows-i ta kuptojë që s'është A4
-    const printWindow = window.open('', '_blank', 'width=200,height=100');
+    const printWindow = window.open('', '_blank', 'width=250,height=150');
     const tapeWidth = "24mm"; 
 
     printWindow.document.write(`
@@ -274,47 +273,55 @@ const InventoryDashboard = ({ isAdmin, isSuperViewer, userInfo }) => {
                     @import url('https://fonts.googleapis.com/css2?family=Libre+Barcode+39&display=swap');
                     
                     @page { 
-                        /* Kjo i thotë printerit: "Gjerësia është 24mm, lartësia aq sa ka tekst" */
                         size: ${tapeWidth} auto; 
                         margin: 0; 
                     }
 
                     body { 
                         margin: 0; 
-                        padding: 2mm 0; /* Pak hapësirë lart e poshtë */
+                        padding: 4mm 0; /* Rritet hapësira lart/poshtë */
                         width: ${tapeWidth};
                         display: flex;
                         flex-direction: column;
-                        align-items: center; /* Kjo e qet tekstin fiks në mes */
-                        overflow: hidden;
+                        align-items: center;
+                        background: white;
+                    }
+
+                    .barcode-box {
+                        width: 85%; /* E detyron barkodin të mos dalë në skaje */
+                        text-align: center;
                     }
 
                     .barcode { 
                         font-family: 'Libre Barcode 39', cursive; 
-                        font-size: 35px; /* Madhësi ideale që të mos thyhet në dy rreshta */
+                        /* E ulim madhësinë që të ketë hapësirë të bardhë majtas/djathtas */
+                        font-size: 28px; 
                         line-height: 1;
                         white-space: nowrap;
+                        letter-spacing: 0.5px; /* Ndihmon në dallimin e vijave */
                     }
 
                     .sn { 
-                        font-size: 11px; 
+                        font-size: 10px; 
                         font-weight: bold; 
                         font-family: Arial, sans-serif;
-                        margin-top: 1mm;
+                        margin-top: 2mm;
                         text-align: center;
-                        width: 100%;
                     }
                 </style>
             </head>
             <body>
-                <div class="barcode">*${item.serialNumber}*</div>
+                <div class="barcode-box">
+                    <div class="barcode">*${item.serialNumber}*</div>
+                </div>
                 <div class="sn">${item.serialNumber}</div>
+                
                 <script>
                     window.onload = function() {
                         setTimeout(() => { 
                             window.print(); 
                             window.close(); 
-                        }, 300);
+                        }, 400);
                     };
                 </script>
             </body>
