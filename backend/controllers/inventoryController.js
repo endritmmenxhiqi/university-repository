@@ -30,11 +30,10 @@ exports.createItem = async (req, res) => {
     try {
         let { description, serialNumber, location, value, status, assignedTo, quantity, unit, fundingSource } = req.body;
         
-        // Auto-gjenerimi i barkodit nëse lihet bosh
         if (!serialNumber || serialNumber.trim() === "") {
             serialNumber = await generateUniqueSN();
         } else {
-            const serialExists = await Inventory.findOne({ serialNumber });
+            const serialExists = await Inventory.findOne({ serialNumber: serialNumber.trim() });
             if (serialExists) {
                 return res.status(400).json({ message: "Ky numër serial ekziston në sistem!" });
             }
@@ -42,7 +41,7 @@ exports.createItem = async (req, res) => {
 
         const newItem = await Inventory.create({
             description: description.trim(),
-            serialNumber,
+            serialNumber: serialNumber.trim(),
             location: location ? location.trim().toUpperCase() : "PANJOHUR",
             value: Number(value) || 0,
             status: status || 'ne_perdorim',
@@ -65,18 +64,15 @@ exports.getItems = async (req, res) => {
         const { location, status, valueRange, search } = req.query;
         let query = {};
 
-        // Kontrolli i qasjes sipas rolit
         const userRole = req.user.role?.toLowerCase();
         const isAdmin = userRole === 'admin';
         const isSuperViewer = userRole === 'super_viewer' || userRole === 'superviewer';
 
         if (!isAdmin && !isSuperViewer) {
-            // Viewer-at shohin vetëm mjetet e tyre
             const emailPrefix = req.user.email.split('@')[0];
             query.assignedTo = { $regex: emailPrefix, $options: 'i' };
         }
 
-        // Filtrat e kërkimit
         if (location && location !== 'KREJT FK') query.location = location.trim().toUpperCase();
         if (status && status !== 'all') query.status = status;
         if (valueRange === 'low') query.value = { $lt: 1000 };
@@ -125,7 +121,32 @@ exports.updateStatus = async (req, res) => {
     }
 };
 
-// 4. HISTORIKU I STATUSIT
+// 4. PËRDITËSIMI I DATËS SË SKANIMIT (Logjika për Kontrollin Vjetor)
+// PERDITESUAR: Përdoret Regex për të pastruar çdo karakter të padukshëm nga skaneri
+exports.updateScanDate = async (req, res) => {
+    try {
+        const { serialNumber } = req.params;
+        
+        // Ky rresht heq çdo karakter që nuk është shkronjë ose numër (heq \r, \n, hapësira)
+        const cleanSN = serialNumber.replace(/[^a-zA-Z0-9-]/g, "").trim();
+
+        const item = await Inventory.findOneAndUpdate(
+            { serialNumber: { $regex: new RegExp(`^${cleanSN}$`, 'i') } },
+            { $set: { lastScanDate: new Date() } },
+            { new: true }
+        );
+
+        if (!item) {
+            return res.status(404).json({ message: `Mjeti me barkod ${cleanSN} nuk u gjet!` });
+        }
+
+        res.json(item);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// 5. HISTORIKU I STATUSIT (E shtuar që të mos ketë error te Routes)
 exports.getHistory = async (req, res) => {
     try {
         const history = await StatusLog.find({ assetId: req.params.id }).sort({ createdAt: -1 });
@@ -135,7 +156,7 @@ exports.getHistory = async (req, res) => {
     }
 };
 
-// 5. IMPORTI NË MASË (BULK)
+// 6. IMPORTI NË MASË (BULK)
 exports.bulkInsert = async (req, res) => {
     try {
         let items = req.body; 
@@ -156,7 +177,7 @@ exports.bulkInsert = async (req, res) => {
     }
 };
 
-// 6. FSHIRJA
+// 7. FSHIRJA
 exports.deleteItem = async (req, res) => {
     try {
         const item = await Inventory.findByIdAndDelete(req.params.id);

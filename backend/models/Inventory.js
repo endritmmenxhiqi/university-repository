@@ -18,14 +18,21 @@ const inventorySchema = new mongoose.Schema({
         enum: ['ne_perdorim', 'ne_depo', 'ne_riparim', 'i_amortizuar'],
         default: 'ne_perdorim'
     },
-    // assignedTo do të ruajë email-in e përdoruesit
+    
+    // --- KJO ËSHTË SHTESA E RE ---
+    lastScanDate: { 
+        type: Date, 
+        default: null // Në fillim do jetë null, që do të thotë rreshti do dalë i kuq menjëherë
+    },
+    // ----------------------------
+
     assignedTo: { 
         type: String, 
         default: '', 
-        lowercase: true, // E kthen automatikisht në shkronja të vogla në DB
+        lowercase: true, 
         trim: true 
     }, 
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
-}, { timestamps: true });
+}, { timestamps: true }); // timestamps: true ruan 'createdAt' (data origjinale)
 
 module.exports = mongoose.model('Inventory', inventorySchema);

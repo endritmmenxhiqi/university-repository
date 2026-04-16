@@ -5,8 +5,8 @@ const PDFDocument = require('pdfkit');
 const path = require('path');
 const { protect, authorize } = require('../middleware/authMiddleware'); // Siguria
 
-// Vetëm Admini mund të shkarkojë raporte
-router.get('/download', protect, authorize('admin'), async (req, res) => {
+// Vetëm Admini dhe Super Viewer mund të shkarkojnë raporte
+router.get('/download', protect, authorize('admin', 'super_viewer'), async (req, res) => {
     try {
         const { location, status, valueRange, member1, member2, member3 } = req.query;
         
