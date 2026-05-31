@@ -166,10 +166,9 @@ async function sendResetPasswordEmail({ email, resetToken, frontendUrl }) {
     try {
         console.log("🔍 [EmailService] Duke zgjidhur DNS për smtp.gmail.com vetëm në IPv4...");
         const dnsPromises = require('dns').promises;
-        const addresses = await dnsPromises.resolve4('smtp.gmail.com');
-        if (addresses && addresses.length > 0) {
-            // Pick a random resolved IPv4 address to balance load
-            smtpHost = addresses[Math.floor(Math.random() * addresses.length)];
+        const result = await dnsPromises.lookup('smtp.gmail.com', { family: 4 });
+        if (result && result.address) {
+            smtpHost = result.address;
             console.log(`🎯 [EmailService] U zgjodh IPv4 adresë direkte: ${smtpHost}`);
         }
     } catch (dnsErr) {
