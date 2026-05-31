@@ -153,6 +153,9 @@ async function sendWithEmailJs({ email, resetUrl, senderEmail }) {
                 email,
                 user_email: email,
                 reset_url: resetUrl,
+                reset_link: resetUrl,
+                link: resetUrl,
+                url: resetUrl,
                 app_name: 'UIBM Inventory',
                 reply_to: senderEmail
             }
