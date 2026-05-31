@@ -62,23 +62,27 @@ async function sendResetPasswordEmail({ email, resetToken, frontendUrl }) {
     console.log('[EmailService] Duke derguar email permes Gmail SMTP...');
 
     try {
-        const [smtpHost] = await dns.promises.resolve4('smtp.gmail.com');
+        const smtpDomain = process.env.SMTP_HOST || 'smtp.gmail.com';
+        const smtpPort = Number(process.env.SMTP_PORT || 587);
+        const smtpSecure = smtpPort === 465;
+        const [smtpHost] = await dns.promises.resolve4(smtpDomain);
         if (!smtpHost) {
-            throw new Error('Nuk u gjet IPv4 per smtp.gmail.com');
+            throw new Error(`Nuk u gjet IPv4 per ${smtpDomain}`);
         }
 
-        console.log(`[EmailService] Gmail SMTP IPv4 host: ${smtpHost}`);
+        console.log(`[EmailService] Gmail SMTP IPv4 host: ${smtpHost}:${smtpPort}`);
 
         const transporter = nodemailer.createTransport({
             host: smtpHost,
-            port: 465,
-            secure: true,
+            port: smtpPort,
+            secure: smtpSecure,
+            requireTLS: !smtpSecure,
             family: 4,
             connectionTimeout: 15000,
             greetingTimeout: 15000,
             socketTimeout: 20000,
             tls: {
-                servername: 'smtp.gmail.com'
+                servername: smtpDomain
             },
             auth: {
                 user: emailUser,
