@@ -5,7 +5,7 @@ import API from '../services/api';
 const ForgotPassword = () => {
     const { token } = useParams();
     const navigate = useNavigate();
-    
+
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [message, setMessage] = useState('');
@@ -14,26 +14,35 @@ const ForgotPassword = () => {
     const handleRequest = async (e) => {
         e.preventDefault();
         setLoading(true);
+        setMessage('');
+
         try {
-            await API.post('/auth/forgot-password', { email });
-            setMessage("✅ Kontrolloni email-in tuaj.");
+            await API.post('/auth/forgot-password', { email: email.trim().toLowerCase() });
+            setMessage('OK: Kontrolloni email-in tuaj.');
         } catch (err) {
-            setMessage("❌ Gabim: Email-i nuk u gjet.");
+            const backendMessage = err.response?.data?.error || err.response?.data?.message;
+            setMessage(`Gabim: ${backendMessage || 'Nuk u dergua email-i i resetimit.'}`);
+            console.error('Forgot password error:', err.response?.data || err.message);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     const handleReset = async (e) => {
         e.preventDefault();
         setLoading(true);
+        setMessage('');
+
         try {
             await API.post(`/auth/reset-password/${token}`, { password });
-            alert("✅ Fjalëkalimi u ndryshua me sukses!");
+            alert('Fjalekalimi u ndryshua me sukses!');
             navigate('/');
         } catch (err) {
-            setMessage("❌ Linku ka skaduar ose është i pasaktë.");
+            const backendMessage = err.response?.data?.message;
+            setMessage(`Gabim: ${backendMessage || 'Linku ka skaduar ose eshte i pasakte.'}`);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     return (
@@ -42,56 +51,60 @@ const ForgotPassword = () => {
                 <div className="forgot-header">
                     <div className="uibm-logo-box">UIBM</div>
                     <h1>Inventory System</h1>
-                    <p className="subtitle">Sistemi i Menaxhimit të Pasurisë</p>
+                    <p className="subtitle">Sistemi i Menaxhimit te Pasurise</p>
                 </div>
 
                 <div className="forgot-body">
-                    <h2>{token ? "Ndrysho Fjalëkalimin" : "Harruat Fjalëkalimin?"}</h2>
+                    <h2>{token ? 'Ndrysho Fjalekalimin' : 'Harruat Fjalekalimin?'}</h2>
                     <p className="instruction-text">
-                        {token ? "Vendosni fjalëkalimin tuaj të ri më poshtë." : "Shënoni email-in për të pranuar linkun e resetimit."}
+                        {token ? 'Vendosni fjalekalimin tuaj te ri me poshte.' : 'Shenoni email-in per te pranuar linkun e resetimit.'}
                     </p>
 
                     <form onSubmit={token ? handleReset : handleRequest} className="forgot-form">
                         {!token ? (
                             <div className="input-field-group">
                                 <label>Email adresa</label>
-                                <input 
-                                    type="email" 
-                                    placeholder="email@umib.net" 
-                                    value={email} 
-                                    onChange={(e) => setEmail(e.target.value)} 
-                                    required 
+                                <input
+                                    type="email"
+                                    placeholder="email@umib.net"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    required
                                 />
                             </div>
                         ) : (
                             <div className="input-field-group">
-                                <label>Fjalëkalimi i Ri</label>
-                                <input 
-                                    type="password" 
-                                    placeholder="********" 
-                                    value={password} 
-                                    onChange={(e) => setPassword(e.target.value)} 
-                                    required 
+                                <label>Fjalekalimi i Ri</label>
+                                <input
+                                    type="password"
+                                    placeholder="********"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    required
                                 />
                             </div>
                         )}
 
                         <button type="submit" className="btn-dark-submit" disabled={loading}>
-                            {loading ? "Duke u procesuar..." : (token ? "Përditëso Fjalëkalimin" : "Dërgo Linkun në Email")}
+                            {loading ? 'Duke u procesuar...' : (token ? 'Perditeso Fjalekalimin' : 'Dergo Linkun ne Email')}
                         </button>
                     </form>
 
-                    {message && <div className={`status-msg ${message.includes('✅') ? 'success' : 'error'}`}>{message}</div>}
+                    {message && (
+                        <div className={`status-msg ${message.startsWith('OK:') ? 'success' : 'error'}`}>
+                            {message}
+                        </div>
+                    )}
 
                     <div className="forgot-footer">
                         <Link to="/" className="back-link">
-                            <span className="arrow">←</span> Kthehu te Login
+                            <span className="arrow">&larr;</span> Kthehu te Login
                         </Link>
                     </div>
                 </div>
 
                 <div className="copyright-text">
-                    © 2026 UIBM INVENTORY MANAGEMENT
+                    &copy; 2026 UIBM INVENTORY MANAGEMENT
                 </div>
             </div>
 
@@ -245,6 +258,14 @@ const ForgotPassword = () => {
                     margin-top: 15px;
                     font-size: 0.9rem;
                     font-weight: 500;
+                }
+
+                .status-msg.success {
+                    color: #15803d;
+                }
+
+                .status-msg.error {
+                    color: #b91c1c;
                 }
 
                 .copyright-text {

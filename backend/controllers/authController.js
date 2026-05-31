@@ -13,7 +13,13 @@ const generateToken = (id) => {
 //     Regjistrimi i një përdoruesi të ri
 exports.register = async (req, res) => {
     try {
-        const { name, email, password, role } = req.body;
+        const { name, password, role } = req.body;
+        const email = req.body.email?.trim().toLowerCase();
+
+        if (!email) {
+            return res.status(400).json({ message: 'Email eshte i detyrueshem' });
+        }
+
         const userExists = await User.findOne({ email });
         if (userExists) {
             return res.status(400).json({ message: 'Ky email është i regjistruar' });
@@ -34,7 +40,13 @@ exports.register = async (req, res) => {
 //     Login i përdoruesit
 exports.login = async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { password } = req.body;
+        const email = req.body.email?.trim().toLowerCase();
+
+        if (!email) {
+            return res.status(400).json({ message: 'Email eshte i detyrueshem' });
+        }
+
         const user = await User.findOne({ email }).select('+password');
         if (user && (await user.matchPassword(password))) {
             res.json({
@@ -55,8 +67,12 @@ exports.login = async (req, res) => {
 //   Kërkesa për harrimin e fjalëkalimit
 exports.forgotPassword = async (req, res) => {
     try {
-        const { email } = req.body;
+        const email = req.body.email?.trim().toLowerCase();
         console.log("1. Email i pranuar:", email);
+
+        if (!email) {
+            return res.status(400).json({ message: 'Email eshte i detyrueshem' });
+        }
 
         const user = await User.findOne({ email });
         if (!user) {
