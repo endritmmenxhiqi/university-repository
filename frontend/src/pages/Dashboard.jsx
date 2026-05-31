@@ -137,25 +137,65 @@ const AddItemForm = ({ onRefresh }) => {
   });
 
   const printDirectly = (item) => {
-    const printWindow = window.open("", "_blank", "width=400,height=300");
+    const printWindow = window.open("", "_blank", "width=400,height=250");
+    const tapeHeight = "24mm";
+    const totalWidth = "40mm";
+
     printWindow.document.write(`
             <html>
                 <head>
-                    <title>Print Barcode</title>
+                    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
                     <style>
-                        @import url('https://fonts.googleapis.com/css2?family=Libre+Barcode+39&display=swap');
-                        body { margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: 'Courier New', monospace; }
-                        .barcode { font-family: 'Libre Barcode 39', cursive; font-size: 80px; margin: 0; line-height: 1; white-space: nowrap; }
-                        .sn { font-size: 14px; margin-top: 10px; letter-spacing: 4px; font-weight: bold; }
-                        .brand { font-size: 10px; margin-bottom: 5px; color: #555; }
-                        @media print { @page { margin: 0; size: auto; } }
+                        * { margin: 0 !important; padding: 0 !important; box-sizing: border-box; }
+                        @page { size: ${totalWidth} ${tapeHeight}; margin: 0 !important; }
+                        body { 
+                            width: ${totalWidth}; 
+                            height: ${tapeHeight}; 
+                            background: white; 
+                            overflow: hidden;
+                            display: block;
+                            text-align: left;
+                        }
+                        .container {
+                            width: 100%;
+                            height: 100%;
+                            display: flex;
+                            flex-direction: column;
+                            align-items: flex-start;
+                            justify-content: center;
+                            padding-left: 2mm;
+                        }
+                        #barcode {
+                            width: 35mm;
+                            height: 12mm;
+                        }
+                        .sn { 
+                            font-size: 11px; 
+                            font-weight: bold; 
+                            font-family: Arial, sans-serif;
+                            margin-top: 1mm !important;
+                            padding-left: 5mm !important;
+                            letter-spacing: 2px;
+                        }
                     </style>
                 </head>
                 <body>
-                    <div class="brand">UIBM ASSET MANAGEMENT</div>
-                    <div class="barcode">*${item.serialNumber}*</div>
-                    <div class="sn">${item.serialNumber}</div>
-                    <script>setTimeout(() => { window.print(); window.close(); }, 500);</script>
+                    <div class="container">
+                        <svg id="barcode"></svg>
+                        <div class="sn">${item.serialNumber}</div>
+                    </div>
+                    <script>
+                        window.onload = function() {
+                            JsBarcode("#barcode", "${item.serialNumber}", {
+                                format: "CODE39",
+                                displayValue: false,
+                                margin: 0,
+                                background: "#ffffff",
+                                lineColor: "#000000"
+                            });
+                            setTimeout(() => { window.print(); window.close(); }, 500);
+                        };
+                    </script>
                 </body>
             </html>
         `);
@@ -320,6 +360,60 @@ const AddItemForm = ({ onRefresh }) => {
   );
 };
 
+
+// --- CUSTOM DROPDOWN ME SCROLL PËR LOKACION ---
+const CustomDropdown = ({ value, onChange, options }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = React.useRef(null);
+
+  const selectedLabel = options.find((o) => o.value === value)?.label || value;
+
+  // Mbyll dropdown-in kur klikohet jashtë
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const shouldScroll = options.length > 5;
+
+  return (
+    <div className="custom-dropdown-wrapper" ref={dropdownRef}>
+      <button
+        type="button"
+        className="custom-dropdown-trigger"
+        onClick={() => setIsOpen((prev) => !prev)}
+      >
+        <span>{selectedLabel}</span>
+        <span className={`custom-dropdown-arrow ${isOpen ? "open" : ""}`}>▼</span>
+      </button>
+      {isOpen && (
+        <div
+          className="custom-dropdown-list"
+          style={shouldScroll ? { maxHeight: "200px", overflowY: "auto" } : {}}
+        >
+          {options.map((opt) => (
+            <div
+              key={opt.value}
+              className={`custom-dropdown-item ${value === opt.value ? "selected" : ""}`}
+              onClick={() => {
+                onChange(opt.value);
+                setIsOpen(false);
+              }}
+            >
+              {opt.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // --- DASHBOARD PËR FILTRIM DHE RAPORT ---
 const InventoryDashboard = ({ isAdmin, isSuperViewer, isViewer, userInfo }) => {
   const [allItems, setAllItems] = useState([]);
@@ -329,6 +423,7 @@ const InventoryDashboard = ({ isAdmin, isSuperViewer, isViewer, userInfo }) => {
   const [selectedValue, setSelectedValue] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
+  const [locationSelectSize, setLocationSelectSize] = useState(1);
   const [commission, setCommission] = useState({
     member1: "",
     member2: "",
@@ -401,70 +496,68 @@ const InventoryDashboard = ({ isAdmin, isSuperViewer, isViewer, userInfo }) => {
   };
 
   const handlePrintBarcode = (item) => {
-    const printWindow = window.open("", "_blank", "width=250,height=150");
-    const tapeWidth = "24mm";
+    const printWindow = window.open("", "_blank", "width=400,height=250");
+    const tapeHeight = "24mm";
+    const totalWidth = "40mm";
 
     printWindow.document.write(`
-        <html>
-            <head>
-                <style>
-                    @import url('https://fonts.googleapis.com/css2?family=Libre+Barcode+39&display=swap');
-                    
-                    @page { 
-                        size: ${tapeWidth} auto; 
-                        margin: 0; 
-                    }
-
-                    body { 
-                        margin: 0; 
-                        padding: 4mm 0; /* Rritet hapësira lart/poshtë */
-                        width: ${tapeWidth};
-                        display: flex;
-                        flex-direction: column;
-                        align-items: center;
-                        background: white;
-                    }
-
-                    .barcode-box {
-                        width: 85%; /* E detyron barkodin të mos dalë në skaje */
-                        text-align: center;
-                    }
-
-                    .barcode { 
-                        font-family: 'Libre Barcode 39', cursive; 
-                        /* E ulim madhësinë që të ketë hapësirë të bardhë majtas/djathtas */
-                        font-size: 28px; 
-                        line-height: 1;
-                        white-space: nowrap;
-                        letter-spacing: 0.5px; /* Ndihmon në dallimin e vijave */
-                    }
-
-                    .sn { 
-                        font-size: 10px; 
-                        font-weight: bold; 
-                        font-family: Arial, sans-serif;
-                        margin-top: 2mm;
-                        text-align: center;
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="barcode-box">
-                    <div class="barcode">*${item.serialNumber}*</div>
-                </div>
-                <div class="sn">${item.serialNumber}</div>
-                
-                <script>
-                    window.onload = function() {
-                        setTimeout(() => { 
-                            window.print(); 
-                            window.close(); 
-                        }, 400);
-                    };
-                </script>
-            </body>
-        </html>
-    `);
+            <html>
+                <head>
+                    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+                    <style>
+                        * { margin: 0 !important; padding: 0 !important; box-sizing: border-box; }
+                        @page { size: ${totalWidth} ${tapeHeight}; margin: 0 !important; }
+                        body { 
+                            width: ${totalWidth}; 
+                            height: ${tapeHeight}; 
+                            background: white; 
+                            overflow: hidden;
+                            display: block;
+                            text-align: left;
+                        }
+                        .container {
+                            width: 100%;
+                            height: 100%;
+                            display: flex;
+                            flex-direction: column;
+                            align-items: flex-start;
+                            justify-content: center;
+                            padding-left: 2mm;
+                        }
+                        #barcode {
+                            width: 35mm;
+                            height: 12mm;
+                        }
+                        .sn { 
+                            font-size: 11px; 
+                            font-weight: bold; 
+                            font-family: Arial, sans-serif;
+                            margin-top: 1mm !important;
+                            padding-left: 5mm !important;
+                            letter-spacing: 2px;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <svg id="barcode"></svg>
+                        <div class="sn">${item.serialNumber}</div>
+                    </div>
+                    <script>
+                        window.onload = function() {
+                            JsBarcode("#barcode", "${item.serialNumber}", {
+                                format: "CODE39",
+                                displayValue: false,
+                                margin: 0,
+                                background: "#ffffff",
+                                lineColor: "#000000"
+                            });
+                            setTimeout(() => { window.print(); window.close(); }, 500);
+                        };
+                    </script>
+                </body>
+            </html>
+        `);
     printWindow.document.close();
   };
 
@@ -690,17 +783,14 @@ const InventoryDashboard = ({ isAdmin, isSuperViewer, isViewer, userInfo }) => {
           {(isAdmin || isSuperViewer) && (
             <div className="filter-group">
               <label>Lokacioni</label>
-              <select
+              <CustomDropdown
                 value={selectedLocation}
-                onChange={(e) => setSelectedLocation(e.target.value)}
-              >
-                <option value="KREJT FK">--- KREJT FK ---</option>
-                {uniqueLocations.map((loc) => (
-                  <option key={loc} value={loc}>
-                    {loc}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setSelectedLocation(val)}
+                options={[
+                  { value: "KREJT FK", label: "--- KREJT FK ---" },
+                  ...uniqueLocations.map((loc) => ({ value: loc, label: loc })),
+                ]}
+              />
             </div>
           )}
           <div className="filter-group">
@@ -1070,6 +1160,18 @@ const DashboardPage = () => {
                 input, select { padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px; outline: none; font-size: 0.95rem; }
                 .submit-btn { background: var(--accent); color: white; border: none; padding: 15px; border-radius: 12px; font-weight: 600; cursor: pointer; transition: 0.3s; }
                 .modern-filters { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-top: 1.5rem; }
+                .filter-group { display: flex; flex-direction: column; gap: 5px; }
+                .custom-dropdown-wrapper { position: relative; width: 100%; }
+                .custom-dropdown-trigger { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px; outline: none; font-size: 0.95rem; background: white; cursor: pointer; color: #334155; font-family: inherit; box-sizing: border-box; }
+                .custom-dropdown-trigger:hover { border-color: #94a3b8; }
+                .custom-dropdown-arrow { font-size: 0.65rem; color: #64748b; transition: transform 0.2s ease; display: inline-block; }
+                .custom-dropdown-arrow.open { transform: rotate(180deg); }
+                .custom-dropdown-list { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: white; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); z-index: 100; overflow: hidden; }
+                .custom-dropdown-list::-webkit-scrollbar { width: 5px; }
+                .custom-dropdown-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+                .custom-dropdown-item { padding: 10px 14px; font-size: 0.9rem; color: #334155; cursor: pointer; transition: background 0.15s; }
+                .custom-dropdown-item:hover { background: #f1f5f9; }
+                .custom-dropdown-item.selected { background: #eff6ff; color: #2563eb; font-weight: 600; }
                 .pdf-btn { background: #10b981; color: white; border: none; border-radius: 12px; padding: 10px; font-weight: 600; cursor: pointer; }
                 .modern-table { width: 100%; border-collapse: collapse; min-width: 900px; }
                 .modern-table th { background: #f1f5f9; padding: 15px; font-size: 0.8rem; text-transform: uppercase; color: #64748b; }
@@ -1158,6 +1260,7 @@ const DashboardPage = () => {
     color: #94a3b8;
     padding: 0 5px;
 }
+
 
 @media (max-width: 768px) {
     .pagination-container {

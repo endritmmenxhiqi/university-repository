@@ -5,7 +5,7 @@ const StatusLog = require('../models/StatusLog');
 
 // Kthen emrin në email: "Filan Fisteku" -> "filan.fisteku@umib.net"
 const formatToEmail = (name) => {
-    if (!name) return "";
+    if (!name || name.trim() === "") return "";
     const cleanName = name.trim().toLowerCase().replace(/\s+/g, '.');
     return cleanName.includes('@umib.net') ? cleanName : `${cleanName}@umib.net`;
 };
