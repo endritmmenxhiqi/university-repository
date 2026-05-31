@@ -167,6 +167,7 @@ async function sendResetPasswordEmail({ email, resetToken, frontendUrl }) {
         host: 'smtp.gmail.com',
         port: 465,
         secure: true, // SSL/TLS
+        family: 4, // Force IPv4 to prevent ENETUNREACH IPv6 errors on cloud platforms like Railway!
         auth: {
             user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASS
