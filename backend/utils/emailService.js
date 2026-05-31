@@ -153,12 +153,13 @@ async function sendResetPasswordEmail({ email, resetToken, frontendUrl }) {
                 console.log("✅ [EmailService] Email-i u dërgua me sukses përmes Resend API!", response.body);
                 return { success: true, provider: 'resend', data: response.body };
             } else {
-                console.warn("⚠️ [EmailService] Resend API ktheu një gabim:", response.body);
-                console.log("🔄 [EmailService] Duke provuar SMTP si fallback...");
+                console.error("❌ [EmailService] Resend API refuzoi dërgimin:", response.body);
+                const errMsg = response.body && response.body.message ? response.body.message : JSON.stringify(response.body);
+                throw new Error(`Resend API Error: ${errMsg}`);
             }
         } catch (apiError) {
             console.error("❌ [EmailService] Gabim gjatë dërgimit përmes Resend API:", apiError.message);
-            console.log("🔄 [EmailService] Duke provuar SMTP si fallback...");
+            throw apiError; // Do not fallback to SMTP if Resend is configured but failed
         }
     }
 
