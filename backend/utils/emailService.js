@@ -1,4 +1,7 @@
 const nodemailer = require('nodemailer');
+const dns = require('node:dns');
+
+dns.setDefaultResultOrder?.('ipv4first');
 
 /**
  * Sends a password reset email using Gmail SMTP (Nodemailer).
@@ -59,14 +62,24 @@ async function sendResetPasswordEmail({ email, resetToken, frontendUrl }) {
     console.log('[EmailService] Duke derguar email permes Gmail SMTP...');
 
     try {
+        const [smtpHost] = await dns.promises.resolve4('smtp.gmail.com');
+        if (!smtpHost) {
+            throw new Error('Nuk u gjet IPv4 per smtp.gmail.com');
+        }
+
+        console.log(`[EmailService] Gmail SMTP IPv4 host: ${smtpHost}`);
+
         const transporter = nodemailer.createTransport({
-            host: 'smtp.gmail.com',
+            host: smtpHost,
             port: 465,
             secure: true,
             family: 4,
             connectionTimeout: 15000,
             greetingTimeout: 15000,
             socketTimeout: 20000,
+            tls: {
+                servername: 'smtp.gmail.com'
+            },
             auth: {
                 user: emailUser,
                 pass: emailPass
