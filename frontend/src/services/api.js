@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API = axios.create({
-    baseURL: 'http://localhost:5000/api', 
+    baseURL: 'https://university-repository-production.up.railway.app/api', 
 });
 
 // Ky interceptor shtohet që çdo kërkesë (pasi të bësh login) të ketë Tokenin automatikisht
