@@ -2,6 +2,12 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
+const dns = require('dns');
+
+// Zgjidhja për problemin "ENETUNREACH IPv6" në Node.js (detaje teknike: Railway/Node.js preferon IPv6, Gmail s'ka route)
+if (dns.setDefaultResultOrder) {
+    dns.setDefaultResultOrder('ipv4first');
+}
 
 // Funksion ndihmës për të krijuar Token-in e Login-it
 const generateToken = (id) => {
