@@ -91,7 +91,7 @@ exports.forgotPassword = async (req, res) => {
         await sendResetPasswordEmail({
             email: user.email,
             resetToken,
-            frontendUrl: process.env.FRONTEND_URL
+            frontendUrl: process.env.FRONTEND_URL || 'https://university-frontend-one.vercel.app'
         });
 
         console.log("3. ✅ Email-i u dërgua me sukses!");
