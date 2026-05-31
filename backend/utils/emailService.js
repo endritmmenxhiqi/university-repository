@@ -231,7 +231,8 @@ async function sendResetPasswordEmail({ email, resetToken, frontendUrl }) {
         throw new Error('EMAIL_USER ose EMAIL_SENDER mungon ne konfigurimin e serverit.');
     }
 
-    const resetUrl = `${frontendUrl}/forgot-password/${resetToken}`;
+    const resetPath = process.env.RESET_PASSWORD_PATH || '/api/auth/reset-password';
+    const resetUrl = `${frontendUrl}${resetPath}/${resetToken}`;
     const subject = 'Resetimi i fjalekalimit';
     const htmlContent = buildResetEmail({ resetUrl });
 

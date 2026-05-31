@@ -91,7 +91,7 @@ exports.forgotPassword = async (req, res) => {
         await sendResetPasswordEmail({
             email: user.email,
             resetToken,
-            frontendUrl: process.env.FRONTEND_URL || 'https://university-frontend-one.vercel.app'
+            frontendUrl: process.env.PASSWORD_RESET_BASE_URL || process.env.BACKEND_PUBLIC_URL || 'https://university-repository-production.up.railway.app'
         });
 
         console.log("3. ✅ Email-i u dërgua me sukses!");
@@ -128,4 +128,135 @@ exports.resetPassword = async (req, res) => {
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
+};
+
+exports.renderResetPasswordPage = async (req, res) => {
+    const { token } = req.params;
+
+    res.type('html').send(`
+<!doctype html>
+<html lang="sq">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Reset Password - UIBM Inventory</title>
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: Arial, sans-serif;
+            background: #f4f7f9;
+            color: #1e293b;
+            padding: 20px;
+        }
+        .card {
+            width: 100%;
+            max-width: 420px;
+            background: #fff;
+            border-radius: 14px;
+            padding: 28px;
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+        }
+        h1 {
+            font-size: 22px;
+            margin: 0 0 10px;
+        }
+        p {
+            color: #64748b;
+            line-height: 1.5;
+            margin: 0 0 20px;
+        }
+        label {
+            display: block;
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 13px 14px;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            font-size: 16px;
+            margin-bottom: 16px;
+        }
+        button {
+            width: 100%;
+            border: 0;
+            border-radius: 10px;
+            padding: 14px;
+            background: #1e293b;
+            color: #fff;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        button:disabled {
+            opacity: 0.7;
+            cursor: wait;
+        }
+        .message {
+            margin-top: 16px;
+            font-weight: 700;
+        }
+        .success {
+            color: #15803d;
+        }
+        .error {
+            color: #b91c1c;
+        }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <h1>Resetimi i fjalekalimit</h1>
+        <p>Vendosni fjalekalimin e ri per llogarine tuaj ne UIBM Inventory.</p>
+        <form id="reset-form">
+            <label for="password">Fjalekalimi i ri</label>
+            <input id="password" name="password" type="password" minlength="6" required placeholder="Minimum 6 karaktere" />
+            <button id="submit-button" type="submit">Ndrysho fjalekalimin</button>
+        </form>
+        <div id="message" class="message"></div>
+    </main>
+    <script>
+        const form = document.getElementById('reset-form');
+        const button = document.getElementById('submit-button');
+        const message = document.getElementById('message');
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            button.disabled = true;
+            message.className = 'message';
+            message.textContent = 'Duke u procesuar...';
+
+            try {
+                const response = await fetch('/api/auth/reset-password/${token}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: form.password.value })
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.message || 'Resetimi deshtoi.');
+                }
+
+                message.className = 'message success';
+                message.textContent = 'Fjalekalimi u ndryshua me sukses. Mund te ktheheni te login.';
+                form.reset();
+            } catch (error) {
+                message.className = 'message error';
+                message.textContent = error.message;
+            } finally {
+                button.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
+    `);
 };
