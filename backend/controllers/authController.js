@@ -1,13 +1,7 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
-const dns = require('dns');
-
-// Zgjidhja për problemin "ENETUNREACH IPv6" në Node.js (detaje teknike: Railway/Node.js preferon IPv6, Gmail s'ka route)
-if (dns.setDefaultResultOrder) {
-    dns.setDefaultResultOrder('ipv4first');
-}
+const { sendResetPasswordEmail } = require('../utils/emailService');
 
 // Funksion ndihmës për të krijuar Token-in e Login-it
 const generateToken = (id) => {
@@ -77,35 +71,13 @@ exports.forgotPassword = async (req, res) => {
         await user.save();
         console.log("2. Token-i u ruajt në DB");
 
-        // Kontrollo variablat e email-it
-        if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-            console.log("❌ ERROR: Mungojnë EMAIL_USER ose EMAIL_PASS në .env");
-            return res.status(500).json({ message: "Konfigurimi i email-it mungon në server." });
-        }
-
-        const transporter = nodemailer.createTransport({
-            service: 'gmail',
-            auth: {
-                user: process.env.EMAIL_USER,
-                pass: process.env.EMAIL_PASS
-            }
+        // Dërgo email-in duke përdorur shërbimin tonë robust të email-it
+        await sendResetPasswordEmail({
+            email: user.email,
+            resetToken,
+            frontendUrl: process.env.FRONTEND_URL
         });
 
-        const resetUrl = `${process.env.FRONTEND_URL}/forgot-password/${resetToken}`;
-
-        const mailOptions = {
-            from: `"UIBM Inventory" <${process.env.EMAIL_USER}>`,
-            to: user.email,
-            subject: 'Resetimi i fjalëkalimit',
-            html: `
-                <h3>Kërkesë për resetim të fjalëkalimit</h3>
-                <p>Ju keni kërkuar të ndryshoni fjalëkalimin. Klikoni butonin e mëposhtëm:</p>
-                <a href="${resetUrl}" style="background: #1e293b; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reset Password</a>
-                <p>Nëse nuk e keni kërkuar ju, ju lutem injorojeni këtë email.</p>
-            `
-        };
-
-        await transporter.sendMail(mailOptions);
         console.log("3. ✅ Email-i u dërgua me sukses!");
         res.json({ message: 'Email-i u dërgua me sukses' });
 
