@@ -161,13 +161,27 @@ async function sendResetPasswordEmail({ email, resetToken, frontendUrl }) {
         throw new Error("Konfigurimi i email-it (EMAIL_USER ose EMAIL_PASS) mungon në skedarin .env. Nuk mund të vazhdohet me dërgimin.");
     }
 
+    // Manual DNS resolution to force IPv4 and fully bypass dual-stack Happy Eyeballs bugs in certain Node/Docker runtimes
+    let smtpHost = 'smtp.gmail.com';
+    try {
+        console.log("🔍 [EmailService] Duke zgjidhur DNS për smtp.gmail.com vetëm në IPv4...");
+        const dnsPromises = require('dns').promises;
+        const addresses = await dnsPromises.resolve4('smtp.gmail.com');
+        if (addresses && addresses.length > 0) {
+            // Pick a random resolved IPv4 address to balance load
+            smtpHost = addresses[Math.floor(Math.random() * addresses.length)];
+            console.log(`🎯 [EmailService] U zgjodh IPv4 adresë direkte: ${smtpHost}`);
+        }
+    } catch (dnsErr) {
+        console.warn("⚠️ [EmailService] Dështoi zgjidhja e DNS në IPv4, duke u rikthyer te emri i hostit standard...", dnsErr.message);
+    }
+
     // Configure Nodemailer transporter explicitly
     // Port 465 (SSL/TLS) is typically more reliable, but we set a custom timeout to fail quickly if blocked.
     const transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
+        host: smtpHost,
         port: 465,
         secure: true, // SSL/TLS
-        family: 4, // Force IPv4 to prevent ENETUNREACH IPv6 errors on cloud platforms like Railway!
         auth: {
             user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASS
@@ -176,6 +190,7 @@ async function sendResetPasswordEmail({ email, resetToken, frontendUrl }) {
         greetingTimeout: 10000,
         socketTimeout: 15000,
         tls: {
+            servername: 'smtp.gmail.com', // CRITICAL: Must be smtp.gmail.com for TLS certificate validation
             rejectUnauthorized: false // Avoid self-signed certificate/SSL handshake rejection issues
         }
     });
