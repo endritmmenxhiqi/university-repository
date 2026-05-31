@@ -39,9 +39,9 @@ function sendHttpRequest(url, headers, body) {
 }
 
 /**
- * Sends a password reset email using Brevo (Sendinblue) HTTP API.
- * Brevo's free tier allows 300 emails/day to ANY email address without domain verification.
- * Uses HTTPS (port 443) so it is never blocked by cloud hosting providers like Railway.
+ * Sends a password reset email using Resend API.
+ * Resend is a modern email service that works immediately without activation.
+ * Uses HTTPS (port 443) so it is never blocked by cloud hosting providers.
  */
 async function sendResetPasswordEmail({ email, resetToken, frontendUrl }) {
     const resetUrl = `${frontendUrl}/forgot-password/${resetToken}`;
@@ -83,38 +83,35 @@ async function sendResetPasswordEmail({ email, resetToken, frontendUrl }) {
         </div>
     `;
 
-    const brevoApiKey = process.env.BREVO_API_KEY;
+    const resendApiKey = process.env.RESEND_API_KEY;
 
-    if (!brevoApiKey || brevoApiKey.trim() === '') {
-        throw new Error('BREVO_API_KEY mungon në konfigurimin e serverit. Shto atë te Railway Variables.');
+    if (!resendApiKey || resendApiKey.trim() === '') {
+        throw new Error('RESEND_API_KEY mungon në konfigurimin e serverit. Shto atë te Railway Variables.');
     }
 
-    console.log("📨 [EmailService] Duke dërguar email përmes Brevo API...");
+    console.log("📨 [EmailService] Duke dërguar email përmes Resend API...");
 
     const response = await sendHttpRequest(
-        'https://api.brevo.com/v3/smtp/email',
+        'https://api.resend.com/emails',
         {
-            'api-key': brevoApiKey,
+            'Authorization': `Bearer ${resendApiKey}`,
             'Content-Type': 'application/json'
         },
         {
-            sender: {
-                name: 'UIBM Inventory',
-                email: process.env.EMAIL_USER || 'endrit.menxhiqi123@gmail.com'
-            },
-            to: [{ email: email }],
+            from: process.env.EMAIL_USER || 'noreply@university-inventory.com',
+            to: email,
             subject: subject,
-            htmlContent: htmlContent
+            html: htmlContent
         }
     );
 
     if (response.ok) {
-        console.log("✅ [EmailService] Email-i u dërgua me sukses përmes Brevo!", response.body);
-        return { success: true, provider: 'brevo', data: response.body };
+        console.log("✅ [EmailService] Email-i u dërgua me sukses përmes Resend!", response.body);
+        return { success: true, provider: 'resend', data: response.body };
     } else {
-        console.error("❌ [EmailService] Brevo API refuzoi dërgimin:", response.body);
+        console.error("❌ [EmailService] Resend API refuzoi dërgimin:", response.body);
         const errMsg = response.body && response.body.message ? response.body.message : JSON.stringify(response.body);
-        throw new Error(`Brevo API Error (${response.status}): ${errMsg}`);
+        throw new Error(`Resend API Error (${response.status}): ${errMsg}`);
     }
 }
 
