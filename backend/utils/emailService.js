@@ -118,6 +118,14 @@ async function sendResetPasswordEmail({ email, resetToken, frontendUrl }) {
 
     // 1. Try Resend HTTP API if a valid key is provided
     const resendApiKey = process.env.RESEND_API_KEY;
+    
+    console.log("🔑 [EmailService] Kontrolli i Resend Key:", {
+        exists: !!resendApiKey,
+        length: resendApiKey ? resendApiKey.length : 0,
+        isPlaceholder: resendApiKey === 're_your_api_key_here',
+        isEmpty: !resendApiKey || resendApiKey.trim() === ''
+    });
+
     const hasResendKey = resendApiKey && resendApiKey !== 're_your_api_key_here' && resendApiKey.trim() !== '';
 
     if (hasResendKey) {
