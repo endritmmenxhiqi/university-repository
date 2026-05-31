@@ -1,47 +1,9 @@
-const https = require('https');
+const nodemailer = require('nodemailer');
 
 /**
- * Helper function to send HTTP POST requests using Node's native 'https' module.
- */
-function sendHttpRequest(url, headers, body) {
-    return new Promise((resolve, reject) => {
-        const urlObj = new URL(url);
-        const bodyStr = JSON.stringify(body);
-
-        const options = {
-            hostname: urlObj.hostname,
-            path: urlObj.pathname,
-            method: 'POST',
-            headers: {
-                ...headers,
-                'Content-Length': Buffer.byteLength(bodyStr)
-            }
-        };
-
-        const req = https.request(options, (res) => {
-            let data = '';
-            res.on('data', (chunk) => { data += chunk; });
-            res.on('end', () => {
-                try {
-                    const parsed = JSON.parse(data);
-                    resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, body: parsed });
-                } catch (e) {
-                    resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, body: data });
-                }
-            });
-        });
-
-        req.on('error', (e) => reject(e));
-        req.setTimeout(15000, () => { req.destroy(new Error('Request timed out')); });
-        req.write(bodyStr);
-        req.end();
-    });
-}
-
-/**
- * Sends a password reset email using Resend API.
- * Resend is a modern email service that works immediately without activation.
- * Uses HTTPS (port 443) so it is never blocked by cloud hosting providers.
+ * Sends a password reset email using Gmail SMTP (Nodemailer).
+ * Uses app-specific password for security - no need for domain verification.
+ * Works immediately without any activation.
  */
 async function sendResetPasswordEmail({ email, resetToken, frontendUrl }) {
     const resetUrl = `${frontendUrl}/forgot-password/${resetToken}`;
@@ -83,35 +45,37 @@ async function sendResetPasswordEmail({ email, resetToken, frontendUrl }) {
         </div>
     `;
 
-    const resendApiKey = process.env.RESEND_API_KEY;
+    const emailUser = process.env.EMAIL_USER;
+    const emailPass = process.env.EMAIL_PASS;
 
-    if (!resendApiKey || resendApiKey.trim() === '') {
-        throw new Error('RESEND_API_KEY mungon në konfigurimin e serverit. Shto atë te Railway Variables.');
+    if (!emailUser || !emailPass) {
+        throw new Error('EMAIL_USER dhe EMAIL_PASS mungojnë në konfigurimin e serverit. Shto ato te Railway Variables.');
     }
 
-    console.log("📨 [EmailService] Duke dërguar email përmes Resend API...");
+    console.log("📨 [EmailService] Duke dërguar email përmes Gmail SMTP...");
 
-    const response = await sendHttpRequest(
-        'https://api.resend.com/emails',
-        {
-            'Authorization': `Bearer ${resendApiKey}`,
-            'Content-Type': 'application/json'
-        },
-        {
-            from: process.env.EMAIL_USER || 'noreply@university-inventory.com',
+    try {
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: emailUser,
+                pass: emailPass
+            }
+        });
+
+        const mailOptions = {
+            from: emailUser,
             to: email,
             subject: subject,
             html: htmlContent
-        }
-    );
+        };
 
-    if (response.ok) {
-        console.log("✅ [EmailService] Email-i u dërgua me sukses përmes Resend!", response.body);
-        return { success: true, provider: 'resend', data: response.body };
-    } else {
-        console.error("❌ [EmailService] Resend API refuzoi dërgimin:", response.body);
-        const errMsg = response.body && response.body.message ? response.body.message : JSON.stringify(response.body);
-        throw new Error(`Resend API Error (${response.status}): ${errMsg}`);
+        const result = await transporter.sendMail(mailOptions);
+        console.log("✅ [EmailService] Email-i u dërgua me sukses përmes Gmail!", result);
+        return { success: true, provider: 'gmail', data: result };
+    } catch (error) {
+        console.error("❌ [EmailService] Gmail SMTP refuzoi dërgimin:", error.message);
+        throw new Error(`Email Service Error: ${error.message}`);
     }
 }
 
