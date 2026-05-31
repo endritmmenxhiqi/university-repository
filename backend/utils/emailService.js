@@ -124,6 +124,53 @@ async function sendWithBrevo({ email, subject, htmlContent, senderEmail }) {
     return { success: true, provider: 'brevo', data: response.body };
 }
 
+async function sendWithEmailJs({ email, resetUrl, senderEmail }) {
+    const serviceId = process.env.EMAILJS_SERVICE_ID;
+    const templateId = process.env.EMAILJS_TEMPLATE_ID;
+    const publicKey = process.env.EMAILJS_PUBLIC_KEY;
+    const privateKey = process.env.EMAILJS_PRIVATE_KEY;
+
+    if (!serviceId || !templateId || !publicKey || !privateKey) {
+        throw new Error('EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY dhe EMAILJS_PRIVATE_KEY mungojne ne konfigurimin e serverit.');
+    }
+
+    console.log('[EmailService] Duke derguar email permes EmailJS API...');
+
+    const response = await sendHttpRequest(
+        'https://api.emailjs.com/api/v1.0/email/send',
+        {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            Origin: process.env.FRONTEND_URL || 'https://university-frontend-one.vercel.app'
+        },
+        {
+            service_id: serviceId,
+            template_id: templateId,
+            user_id: publicKey,
+            accessToken: privateKey,
+            template_params: {
+                to_email: email,
+                email,
+                user_email: email,
+                reset_url: resetUrl,
+                app_name: 'UIBM Inventory',
+                reply_to: senderEmail
+            }
+        }
+    );
+
+    if (!response.ok) {
+        console.error('[EmailService] EmailJS API refuzoi dergimin:', response.body);
+        const errorMessage = typeof response.body === 'string'
+            ? response.body
+            : response.body?.message || JSON.stringify(response.body);
+        throw new Error(`EmailJS API Error (${response.status}): ${errorMessage}`);
+    }
+
+    console.log('[EmailService] Email-i u dergua me sukses permes EmailJS!', response.body);
+    return { success: true, provider: 'emailjs', data: response.body };
+}
+
 async function sendWithGmailSmtp({ email, subject, htmlContent, emailUser, emailPass, emailFrom }) {
     console.log('[EmailService] Duke derguar email permes Gmail SMTP...');
 
@@ -184,6 +231,15 @@ async function sendResetPasswordEmail({ email, resetToken, frontendUrl }) {
     const resetUrl = `${frontendUrl}/forgot-password/${resetToken}`;
     const subject = 'Resetimi i fjalekalimit';
     const htmlContent = buildResetEmail({ resetUrl });
+
+    if (
+        process.env.EMAILJS_SERVICE_ID &&
+        process.env.EMAILJS_TEMPLATE_ID &&
+        process.env.EMAILJS_PUBLIC_KEY &&
+        process.env.EMAILJS_PRIVATE_KEY
+    ) {
+        return sendWithEmailJs({ email, resetUrl, senderEmail });
+    }
 
     if (process.env.BREVO_API_KEY) {
         return sendWithBrevo({ email, subject, htmlContent, senderEmail });
