@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import API from '../services/api';
 
@@ -35,8 +35,8 @@ const ForgotPassword = () => {
 
         try {
             await API.post(`/auth/reset-password/${token}`, { password });
-            alert('Fjalekalimi u ndryshua me sukses!');
-            navigate('/');
+            setMessage('OK: Fjalekalimi u ndryshua me sukses!');
+            setTimeout(() => navigate('/'), 3000);
         } catch (err) {
             const backendMessage = err.response?.data?.message;
             setMessage(`Gabim: ${backendMessage || 'Linku ka skaduar ose eshte i pasakte.'}`);
@@ -93,6 +93,13 @@ const ForgotPassword = () => {
                     {message && (
                         <div className={`status-msg ${message.startsWith('OK:') ? 'success' : 'error'}`}>
                             {message}
+                            {message.startsWith('OK:') && (
+                                <div style={{ marginTop: '12px' }}>
+                                    <Link to="/" className="back-link">
+                                        <span className="arrow">&larr;</span> Shko tek Login-i
+                                    </Link>
+                                </div>
+                            )}
                         </div>
                     )}
 

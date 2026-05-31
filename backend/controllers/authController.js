@@ -132,6 +132,7 @@ exports.resetPassword = async (req, res) => {
 
 exports.renderResetPasswordPage = async (req, res) => {
     const { token } = req.params;
+    const loginUrl = process.env.LOGIN_URL || process.env.FRONTEND_URL || 'https://university-frontend-one.vercel.app';
 
     res.type('html').send(`
 <!doctype html>
@@ -203,6 +204,16 @@ exports.renderResetPasswordPage = async (req, res) => {
             margin-top: 16px;
             font-weight: 700;
         }
+        .login-link {
+            display: inline-block;
+            margin-top: 16px;
+            color: #2563eb;
+            font-weight: 700;
+            text-decoration: none;
+        }
+        .login-link:hover {
+            text-decoration: underline;
+        }
         .success {
             color: #15803d;
         }
@@ -221,6 +232,7 @@ exports.renderResetPasswordPage = async (req, res) => {
             <button id="submit-button" type="submit">Ndrysho fjalekalimin</button>
         </form>
         <div id="message" class="message"></div>
+        <a class="login-link" href="${loginUrl}">Kthehu te Login</a>
     </main>
     <script>
         const form = document.getElementById('reset-form');
@@ -246,8 +258,14 @@ exports.renderResetPasswordPage = async (req, res) => {
                 }
 
                 message.className = 'message success';
-                message.textContent = 'Fjalekalimi u ndryshua me sukses. Mund te ktheheni te login.';
+                message.innerHTML = 'Fjalekalimi u ndryshua me sukses. <br/><br/>Duke u ridrejtuar te Login-i...';
                 form.reset();
+                
+                // Ridrejtimi automatik tek Login-i pas 3 sekondash
+                setTimeout(() => {
+                    window.location.href = "${loginUrl}";
+                }, 3000);
+                
             } catch (error) {
                 message.className = 'message error';
                 message.textContent = error.message;
